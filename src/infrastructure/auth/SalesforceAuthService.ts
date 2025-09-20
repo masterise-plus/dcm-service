@@ -1,20 +1,6 @@
-import { ConfigService } from '../../config/Config.js';
-
-export interface AuthService {
-  getAccessToken(): Promise<string>;
-  refreshToken(): Promise<string>;
-}
-
-export interface AuthResponse {
-  access_token: string;
-  signature: string;
-  scope: string;
-  instance_url: string;
-  id: string;
-  token_type: string;
-  issued_at: string;
-  api_instance_url?: string;
-}
+import { AuthService } from '@/interfaces/AuthService';
+import { ConfigService } from '@/config/Config';
+import { AuthResponse } from '@/interfaces/AuthResponse';
 
 export class SalesforceAuthService implements AuthService {
   private config = ConfigService.getInstance().getConfig();

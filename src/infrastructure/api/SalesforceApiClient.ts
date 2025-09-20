@@ -51,9 +51,11 @@ export class SalesforceApiClient implements ApiClient {
     console.log('[API] Query response:', {
       done: data.done,
       rowCount: data.rowCount,
+      returnedRows: data.returnedRows,
       queryId: data.queryId,
       dataLength: data.data?.length || 0,
-      metadataKeys: Object.keys(data.metadata || {})
+      metadataFields: data.metadata?.length || 0,
+      metadataNames: data.metadata?.map(item => item.name) || []
     });
 
     return data;

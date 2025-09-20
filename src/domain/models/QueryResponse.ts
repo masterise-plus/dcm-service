@@ -1,4 +1,8 @@
-import { MetadataField } from '../../types/MetaDataField.js';
+export interface MetadataItem {
+  name: string;
+  nullable: boolean;
+  type: string;
+}
 
 export interface QueryResponse {
   data: any[];
@@ -8,7 +12,16 @@ export interface QueryResponse {
   startTime?: string;
   endTime?: string;
   rowCount?: number;
-  metadata: Record<string, MetadataField>;
+  metadata: MetadataItem[];
+  returnedRows?: number;
+  status?: {
+    chunkCount: number;
+    completionStatus: string;
+    expirationTime: string;
+    progress: number;
+    queryId: string;
+    rowCount: number;
+  };
 }
 
 export interface QueryRequest {

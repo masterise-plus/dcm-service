@@ -1,5 +1,5 @@
-import { ApiClient } from '../../infrastructure/api/SalesforceApiClient.js';
-import { QueryResponse } from '../../domain/models/QueryResponse.js';
+import { ApiClient } from '@/infrastructure/api/SalesforceApiClient';
+import { QueryResponse } from '@/domain/models/QueryResponse';
 
 export interface QueryService {
   executeQuery(sql: string): Promise<QueryResponse>;

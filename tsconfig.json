@@ -5,6 +5,14 @@
     "moduleResolution": "NodeNext",
     "outDir": "dist",
     "rootDir": "src",
+    "baseUrl": "./src",
+    "paths": {
+      "@/*": ["./*"],
+      "@interfaces/*": ["interfaces/*"],
+      "@services/*": ["services/*"],
+      "@config/*": ["config/*"],
+      "@utils/*": ["utils/*"]
+    },
     "types": ["node"],
     "strict": true,
     "skipLibCheck": true

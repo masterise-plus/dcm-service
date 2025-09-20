@@ -1,7 +1,7 @@
 import { createWriteStream } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
-import { MetadataField } from '../types/MetaDataField.js';
+import { MetadataItem } from '../domain/models/QueryResponse.js';
 
 export class CsvWriter {
   private filePath: string;
@@ -66,10 +66,8 @@ export class CsvWriter {
     return headers.map(header => row[header]);
   }
 
-  static getHeaderOrder(metadata: Record<string, MetadataField>): string[] {
-    // Sort by placeInOrder ascending (0..N)
-    return Object.entries(metadata)
-      .sort((a, b) => a[1].placeInOrder - b[1].placeInOrder)
-      .map(([name]) => name);
+  static getHeadersFromMetadata(metadata: MetadataItem[]): string[] {
+    // Extract names from metadata array to use as CSV headers
+    return metadata.map(item => item.name);
   }
 }

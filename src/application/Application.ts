@@ -27,8 +27,8 @@ export class Application {
       // Execute initial query
       const firstResponse = await this.queryService.executeQuery(this.config.sqlQuery);
       
-      // Get ordered headers
-      const headers = CsvWriter.getHeaderOrder(firstResponse.metadata);
+      // Get headers from metadata array
+      const headers = CsvWriter.getHeadersFromMetadata(firstResponse.metadata);
       
       // Write headers
       csvWriter.writeHeaders(headers);
@@ -57,7 +57,7 @@ export class Application {
 
       csvWriter.close();
       console.log('✅ Salesforce data export completed successfully!');
-      console.log(`📊 Total rows processed: ${firstResponse.rowCount || 'unknown'}`);
+      console.log(`📊 Total rows processed: ${firstResponse.returnedRows || firstResponse.rowCount || 'unknown'}`);
       
     } catch (error) {
       console.error('❌ Error during export:', error);

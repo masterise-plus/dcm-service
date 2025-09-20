@@ -20,3 +20,6 @@ yarn-error.log*
 
 # Optional: IDE settings
 .vscode/
+
+# Ignore files starting with baseevent
+baseevent*
