@@ -1,11 +1,7 @@
+import { ApiClient } from '@/interfaces/ApiClient.js';
 import { ConfigService } from '../../config/Config.js';
 import { QueryResponse, QueryRequest } from '../../domain/models/QueryResponse.js';
 import { SalesforceAuthService } from '../auth/SalesforceAuthService.js';
-
-export interface ApiClient {
-  postQuery(sql: string): Promise<QueryResponse>;
-  getNextBatch(nextBatchId: string): Promise<QueryResponse>;
-}
 
 export class SalesforceApiClient implements ApiClient {
   private config = ConfigService.getInstance().getConfig();
