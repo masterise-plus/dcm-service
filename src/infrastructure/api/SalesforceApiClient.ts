@@ -27,9 +27,85 @@ export class SalesforceApiClient implements ApiClient {
 
   public async getAccessToken(): Promise<string> {
     if (this.authService) {
+      // Check if we have a cached token first
+      const cachedToken = this.authService.getCachedToken();
+      const isTokenExpired = this.authService.isTokenExpired();
+      const timeUntilExpiry = this.authService.getTimeUntilExpiry();
+      
+      this.logger.info('OAuth authentication - checking token status', {
+        hasCachedToken: !!cachedToken,
+        isTokenExpired: isTokenExpired,
+        timeUntilExpiryMs: timeUntilExpiry,
+        timeUntilExpiryMinutes: Math.round(timeUntilExpiry / 60000)
+      });
+
+      if (cachedToken && !isTokenExpired) {
+        this.logger.info('Using cached OAuth token', {
+          tokenLength: cachedToken.length,
+          expiresInMinutes: Math.round(timeUntilExpiry / 60000),
+          expiryTime: new Date(this.authService.getTokenExpiryTime()).toISOString()
+        });
+      }
+
       return this.authService.getAccessToken();
     }
-    return this.config.accessToken;
+    
+    // For static tokens, validate before use
+    const staticToken = this.config.accessToken;
+    if (staticToken) {
+      const isValid = await this.validateStaticToken(staticToken);
+      if (isValid) {
+        this.logger.info('Using validated static access token');
+        return staticToken;
+      } else {
+        this.logger.error('Static access token is invalid');
+        throw new Error('Static access token is invalid and no OAuth credentials available');
+      }
+    }
+
+    throw new Error('No valid authentication method available');
+  }
+
+  /**
+   * Validate static access token using Salesforce API
+   */
+  private async validateStaticToken(token: string): Promise<boolean> {
+    try {
+      this.logger.debug('Validating static access token', { 
+        tokenLength: token.length,
+        instanceUrl: this.config.instanceUrl 
+      });
+
+      // Use a lightweight Salesforce API endpoint to validate token
+      const validationUrl = `${this.config.instanceUrl}/services/data/${this.config.apiVersion}/limits`;
+      
+      const response = await fetch(validationUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'User-Agent': 'SalesforceApiClient/1.0'
+        }
+      });
+
+      const isValid = response.ok;
+      
+      if (isValid) {
+        this.logger.debug('Static token validation successful');
+      } else {
+        this.logger.warn('Static token validation failed', { 
+          status: response.status,
+          statusText: response.statusText
+        });
+      }
+
+      return isValid;
+    } catch (error) {
+      this.logger.error('Static token validation error', { 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      return false;
+    }
   }
 
   async postQuery(sql: string): Promise<QueryResponse> {

@@ -8,6 +8,8 @@ export class SalesforceAuthService implements AuthService {
   private currentToken: string | null = null;
   private tokenExpiry: number = 0;
   private logger = createServiceLogger('SalesforceAuthService');
+  private validationCache: Map<string, { isValid: boolean; timestamp: number }> = new Map();
+  private readonly VALIDATION_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
   constructor(
     private clientId: string,
@@ -22,16 +24,130 @@ export class SalesforceAuthService implements AuthService {
   }
 
   async getAccessToken(): Promise<string> {
-    if (this.currentToken && Date.now() < this.tokenExpiry) {
-      this.logger.debug('Using cached access token', { 
-        tokenLength: this.currentToken.length,
-        expiresIn: this.tokenExpiry - Date.now() 
-      });
-      return this.currentToken;
+    // First check if we have a cached token that's not expired
+    if (this.currentToken && !this.isTokenExpired()) {
+      // Validate the cached token before using it
+      const isValid = await this.isTokenValid();
+      if (isValid) {
+        const timeUntilExpiry = this.getTimeUntilExpiry();
+        this.logger.info('Using validated cached access token', { 
+          tokenLength: this.currentToken.length,
+          expiresInMs: timeUntilExpiry,
+          expiresInMinutes: Math.round(timeUntilExpiry / 60000),
+          expiryTime: new Date(this.tokenExpiry).toISOString()
+        });
+        return this.currentToken;
+      } else {
+        this.logger.warn('Cached token validation failed, will refresh');
+        this.clearCachedToken();
+      }
     }
 
-    this.logger.info('Access token expired or not available, refreshing token');
+    if (this.isTokenExpired()) {
+      this.logger.warn('Access token has expired', {
+        currentTime: new Date().toISOString(),
+        expiryTime: new Date(this.tokenExpiry).toISOString(),
+        timeSinceExpiry: Date.now() - this.tokenExpiry
+      });
+    } else {
+      this.logger.info('Access token not available or invalid, refreshing token');
+    }
+    
     return this.refreshToken();
+  }
+
+  getCachedToken(): string | null {
+    return this.currentToken;
+  }
+
+  getTokenExpiryTime(): number {
+    return this.tokenExpiry;
+  }
+
+  getTimeUntilExpiry(): number {
+    if (!this.currentToken || this.tokenExpiry === 0) {
+      return 0;
+    }
+    return this.tokenExpiry - Date.now();
+  }
+
+  isTokenExpired(): boolean {
+    if (!this.currentToken || this.tokenExpiry === 0) {
+      return true;
+    }
+    return Date.now() >= this.tokenExpiry;
+  }
+
+  async isTokenValid(): Promise<boolean> {
+    if (!this.currentToken) {
+      return false;
+    }
+
+    // Check validation cache first
+    const cacheKey = this.currentToken.substring(0, 50); // Use first 50 chars as cache key
+    const cachedValidation = this.validationCache.get(cacheKey);
+    
+    if (cachedValidation && Date.now() - cachedValidation.timestamp < this.VALIDATION_CACHE_TTL) {
+      this.logger.debug('Using cached validation result', { isValid: cachedValidation.isValid });
+      return cachedValidation.isValid;
+    }
+
+    // Validate the token
+    const isValid = await this.validateToken(this.currentToken);
+    
+    // Cache the validation result
+    this.validationCache.set(cacheKey, {
+      isValid,
+      timestamp: Date.now()
+    });
+
+    return isValid;
+  }
+
+  async validateToken(token: string): Promise<boolean> {
+    try {
+      this.logger.debug('Validating access token', { 
+        tokenLength: token.length,
+        instanceUrl: this.config.instanceUrl 
+      });
+
+      // Use Salesforce identity endpoint to validate token
+      const identityUrl = `${this.config.instanceUrl}/services/oauth2/userinfo`;
+      
+      const response = await fetch(identityUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'User-Agent': 'SalesforceAuthService/1.0'
+        }
+      });
+
+      if (response.ok) {
+        this.logger.debug('Token validation successful');
+        return true;
+      } else {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        this.logger.warn('Token validation failed', { 
+          status: response.status,
+          statusText: response.statusText,
+          errorText: errorText.substring(0, 200) // Limit error text length
+        });
+        return false;
+      }
+    } catch (error) {
+      this.logger.error('Token validation error', { 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      return false;
+    }
+  }
+
+  private clearCachedToken(): void {
+    this.currentToken = null;
+    this.tokenExpiry = 0;
+    this.validationCache.clear();
+    this.logger.debug('Cleared cached token and validation cache');
   }
 
   async refreshToken(): Promise<string> {
