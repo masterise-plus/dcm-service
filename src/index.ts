@@ -10,11 +10,11 @@ async function main(): Promise<void> {
   const runScheduled = process.env.RUN_SCHEDULED === 'true';
   
   if (runScheduled) {
-    logger.info('🕐 Starting Salesforce data export in scheduled mode (every 2 minutes)...');
+    logger.info('🕐 Starting Salesforce data export in scheduled mode (every 30 minutes)...');
     
-    // Create cron job that runs every 2 minutes
+    // Create cron job that runs every 30 minutes
     const job = new CronJob(
-      '*/2 * * * *', // Cron pattern for every 2 minutes
+      '*/30 * * * *', // Cron pattern for every 30 minutes
       async () => {
         await app.runScheduled();
       },
@@ -23,7 +23,7 @@ async function main(): Promise<void> {
       'Asia/Jakarta' // timeZone (adjust as needed)
     );
     
-    logger.info('✅ Cron job scheduled to run every 2 minutes');
+    logger.info('✅ Cron job scheduled to run every 30 minutes');
     logger.info('📝 Press Ctrl+C to stop the scheduled execution');
     
     // Keep the process alive

@@ -15,7 +15,10 @@
     },
     "types": ["node"],
     "strict": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "plugins": [
+      { "transform": "typescript-transform-paths" }
+    ]
   },
   "include": ["src"]
 }
