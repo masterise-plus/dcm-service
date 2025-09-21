@@ -23,3 +23,6 @@ yarn-error.log*
 
 # Ignore files starting with baseevent
 baseevent*
+
+# Documentation folder
+docs/
