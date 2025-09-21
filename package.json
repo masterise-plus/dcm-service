@@ -8,11 +8,15 @@
     "dev": "tsx src/index.ts"
   },
   "dependencies": {
-    "dotenv": "^16.4.5"
+    "@logtail/node": "^0.5.6",
+    "@logtail/winston": "^0.5.6",
+    "cron": "4.3.3",
+    "dotenv": "16.4.5",
+    "winston": "3.17.0"
   },
   "devDependencies": {
-    "@types/node": "^24.3.1",
-    "tsx": "^4.19.2",
-    "typescript": "^5.6.3"
+    "@types/node": "24.3.1",
+    "tsx": "4.19.2",
+    "typescript": "5.6.3"
   }
 }

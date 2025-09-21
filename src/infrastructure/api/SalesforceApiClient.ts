@@ -1,11 +1,14 @@
 import { ApiClient } from '@/interfaces/ApiClient.js';
 import { ConfigService } from '../../config/Config.js';
-import { QueryResponse, QueryRequest } from '../../domain/models/QueryResponse.js';
+import { QueryResponse } from '../../domain/models/QueryResponse.js';
+import { QueryRequest } from '@/domain/models/QueryRequest.js';
 import { SalesforceAuthService } from '../auth/SalesforceAuthService.js';
+import { createServiceLogger } from '../../utils/Logger.js';
 
 export class SalesforceApiClient implements ApiClient {
   private config = ConfigService.getInstance().getConfig();
   private authService: SalesforceAuthService | null = null;
+  private logger = createServiceLogger('SalesforceApiClient');
 
   constructor() {
     if (this.config.useOAuth && this.config.clientId && this.config.clientSecret) {
@@ -13,6 +16,12 @@ export class SalesforceApiClient implements ApiClient {
         this.config.clientId,
         this.config.clientSecret
       );
+      this.logger.info('OAuth authentication configured', { 
+        clientId: this.config.clientId,
+        hasClientSecret: !!this.config.clientSecret 
+      });
+    } else {
+      this.logger.info('Using static access token authentication');
     }
   }
 
@@ -27,6 +36,12 @@ export class SalesforceApiClient implements ApiClient {
     const accessToken = await this.getAccessToken();
     const url = `${this.config.instanceUrl}/services/data/${this.config.apiVersion}/ssot/query-sql?dataspace=${encodeURIComponent(this.config.dataspace)}`;
     
+    this.logger.info('Executing Salesforce query', { 
+      dataspace: this.config.dataspace,
+      queryLength: sql.length,
+      instanceUrl: this.config.instanceUrl
+    });
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -39,19 +54,26 @@ export class SalesforceApiClient implements ApiClient {
 
     if (!response.ok) {
       const text = await response.text().catch(() => '');
+      this.logger.error('Query POST failed', { 
+        status: response.status, 
+        statusText: response.statusText,
+        errorText: text,
+        url: url 
+      });
       throw new Error(`Query POST failed ${response.status}: ${text}`);
     }
 
     const data = await response.json() as QueryResponse;
     
-    console.log('[API] Query response:', {
+    this.logger.info('✅ Query executed successfully', {
       done: data.done,
       rowCount: data.rowCount,
       returnedRows: data.returnedRows,
       queryId: data.queryId,
       dataLength: data.data?.length || 0,
       metadataFields: data.metadata?.length || 0,
-      metadataNames: data.metadata?.map(item => item.name) || []
+      metadataNames: data.metadata?.map(item => item.name) || [],
+      hasNextBatch: !!data.nextBatchId
     });
 
     return data;
@@ -61,6 +83,11 @@ export class SalesforceApiClient implements ApiClient {
     const accessToken = await this.getAccessToken();
     const url = `${this.config.instanceUrl}/services/data/${this.config.apiVersion}/ssot/query-sql/${encodeURIComponent(nextBatchId)}?dataspace=${encodeURIComponent(this.config.dataspace)}`;
     
+    this.logger.info('Fetching next batch of query results', { 
+      nextBatchId,
+      dataspace: this.config.dataspace 
+    });
+
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -71,19 +98,28 @@ export class SalesforceApiClient implements ApiClient {
 
     if (!response.ok) {
       const text = await response.text().catch(() => '');
+      this.logger.error('Query NEXT failed', { 
+        status: response.status, 
+        statusText: response.statusText,
+        errorText: text,
+        nextBatchId,
+        url: url 
+      });
       throw new Error(`Query NEXT failed ${response.status}: ${text}`);
     }
 
     const data = await response.json() as QueryResponse;
     
-    console.log('[API] Next batch response:', {
+    this.logger.info('✅ Next batch fetched successfully', {
       done: data.done,
       rowCount: data.rowCount,
       queryId: data.queryId,
       dataLength: data.data?.length || 0,
-      nextBatchId: data.nextBatchId
+      nextBatchId: data.nextBatchId,
+      hasMoreBatches: !!data.nextBatchId
     });
 
     return data;
   }
 }
+export { ApiClient };

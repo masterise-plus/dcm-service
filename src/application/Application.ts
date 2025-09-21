@@ -2,23 +2,25 @@ import { ConfigService } from '../config/Config.js';
 import { SalesforceApiClient } from '../infrastructure/api/SalesforceApiClient.js';
 import { SalesforceQueryService } from './services/QueryService.js';
 import { CsvWriter } from '../utils/CsvWriter.js';
+import logger, { createServiceLogger } from '../utils/Logger.js';
 
 export class Application {
   private config = ConfigService.getInstance().getConfig();
   private apiClient = new SalesforceApiClient();
   private queryService = new SalesforceQueryService(this.apiClient);
+  private logger = createServiceLogger('Application');
 
   async run(): Promise<void> {
     try {
-      console.log('🚀 Starting Salesforce data export...');
+      this.logger.info('🚀 Starting Salesforce data export...');
       
       // Initialize authentication if OAuth is enabled
       if (this.config.useOAuth) {
-        console.log('🔐 Using OAuth authentication');
+        this.logger.info('🔐 Using OAuth authentication');
         const token = await this.apiClient.getAccessToken();
-        console.log('✅ Authentication successful');
+        this.logger.info('✅ Authentication successful', { tokenLength: token.length });
       } else {
-        console.log('🔑 Using static access token');
+        this.logger.info('🔑 Using static access token');
       }
       
       const csvWriter = new CsvWriter(this.config.outputCsvPath);
@@ -37,12 +39,12 @@ export class Application {
       this.writeDataToCsv(csvWriter, firstResponse.data, headers);
 
       // Handle pagination
+      let batchCount = 1;
       if (!firstResponse.done && firstResponse.nextBatchId) {
         let nextBatchId = firstResponse.nextBatchId;
-        let batchCount = 1;
         
         while (nextBatchId) {
-          console.log(`📄 Fetching batch ${batchCount + 1}...`);
+          this.logger.info(`📄 Fetching batch ${batchCount + 1}...`);
           const nextResponse = await this.apiClient.getNextBatch(nextBatchId);
           this.writeDataToCsv(csvWriter, nextResponse.data, headers);
           
@@ -56,15 +58,31 @@ export class Application {
       }
 
       csvWriter.close();
-      console.log('✅ Salesforce data export completed successfully!');
-      console.log(`📊 Total rows processed: ${firstResponse.returnedRows || firstResponse.rowCount || 'unknown'}`);
+      this.logger.info('✅ Salesforce data export completed successfully!', {
+        totalRows: firstResponse.returnedRows || firstResponse.rowCount,
+        batchesProcessed: batchCount,
+        outputFile: this.config.outputCsvPath
+      });
       
     } catch (error) {
-      console.error('❌ Error during export:', error);
+      this.logger.error('❌ Error during export:', error);
       if (error instanceof Error) {
-        console.error('Error details:', error.message);
+        this.logger.error('Error details:', { message: error.message, stack: error.stack });
       }
       throw error;
+    }
+  }
+
+  async runScheduled(): Promise<void> {
+    const timestamp = new Date().toISOString();
+    this.logger.info(`⏰ Starting scheduled Salesforce data export...`, { timestamp });
+    
+    try {
+      await this.run();
+      this.logger.info(`✅ Scheduled export completed successfully!`, { timestamp });
+    } catch (error) {
+      this.logger.error(`❌ Error during scheduled export:`, { timestamp, error });
+      // Don't throw error in scheduled mode to prevent cron job from stopping
     }
   }
 

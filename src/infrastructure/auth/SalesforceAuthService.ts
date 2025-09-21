@@ -1,29 +1,48 @@
 import { AuthService } from '@/interfaces/AuthService';
 import { ConfigService } from '@/config/Config';
 import { AuthResponse } from '@/interfaces/AuthResponse';
+import { createServiceLogger } from '@/utils/Logger';
 
 export class SalesforceAuthService implements AuthService {
   private config = ConfigService.getInstance().getConfig();
   private currentToken: string | null = null;
   private tokenExpiry: number = 0;
+  private logger = createServiceLogger('SalesforceAuthService');
 
   constructor(
     private clientId: string,
     private clientSecret: string,
     private grantType: string = 'client_credentials'
-  ) {}
+  ) {
+    this.logger.info('SalesforceAuthService initialized', { 
+      clientId: this.clientId,
+      grantType: this.grantType,
+      hasClientSecret: !!this.clientSecret 
+    });
+  }
 
   async getAccessToken(): Promise<string> {
     if (this.currentToken && Date.now() < this.tokenExpiry) {
+      this.logger.debug('Using cached access token', { 
+        tokenLength: this.currentToken.length,
+        expiresIn: this.tokenExpiry - Date.now() 
+      });
       return this.currentToken;
     }
 
+    this.logger.info('Access token expired or not available, refreshing token');
     return this.refreshToken();
   }
 
   async refreshToken(): Promise<string> {
     const url = `${this.config.instanceUrl}/services/oauth2/token`;
     
+    this.logger.info('🔐 Refreshing OAuth token', { 
+      instanceUrl: this.config.instanceUrl,
+      grantType: this.grantType,
+      clientId: this.clientId 
+    });
+
     const formData = new URLSearchParams();
     formData.append('grant_type', this.grantType);
     formData.append('client_id', this.clientId);
@@ -52,6 +71,12 @@ export class SalesforceAuthService implements AuthService {
 
     if (!response.ok) {
       const text = await response.text().catch(() => '');
+      this.logger.error('❌ OAuth token request failed', { 
+        status: response.status,
+        statusText: response.statusText,
+        errorText: text,
+        url: url 
+      });
       throw new Error(`OAuth token request failed ${response.status}: ${text}`);
     }
 
@@ -61,9 +86,14 @@ export class SalesforceAuthService implements AuthService {
     this.currentToken = authData.access_token;
     this.tokenExpiry = Date.now() + (2 * 60 * 60 * 1000); // 2 hours from now
     
-    console.log('[Auth] Successfully obtained access token');
-    console.log('[Auth] Token scope:', authData.scope);
-    console.log('[Auth] Instance URL:', authData.instance_url);
+    this.logger.info('✅ Successfully obtained access token', {
+      tokenType: authData.token_type,
+      scope: authData.scope,
+      instanceUrl: authData.instance_url,
+      issuedAt: authData.issued_at,
+      tokenLength: authData.access_token.length,
+      expiresAt: new Date(this.tokenExpiry).toISOString()
+    });
     
     return this.currentToken;
   }
