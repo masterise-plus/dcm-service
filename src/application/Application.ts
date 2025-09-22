@@ -2,12 +2,14 @@ import { ConfigService } from '../config/Config.js';
 import { SalesforceApiClient } from '../infrastructure/api/SalesforceApiClient.js';
 import { SalesforceQueryService } from './services/QueryService.js';
 import { CsvWriter } from '../utils/CsvWriter.js';
+import { GoogleCloudStorageService } from '../infrastructure/storage/GoogleCloudStorageService.js';
 import logger, { createServiceLogger } from '../utils/Logger.js';
 
 export class Application {
   private config = ConfigService.getInstance().getConfig();
   private apiClient = new SalesforceApiClient();
   private queryService = new SalesforceQueryService(this.apiClient);
+  private gcsService = new GoogleCloudStorageService(this.config.gcsKeyFilename);
   private logger = createServiceLogger('Application');
 
   async run(): Promise<void> {
@@ -58,10 +60,40 @@ export class Application {
       }
 
       csvWriter.close();
+
+      // Upload to Google Cloud Storage if enabled
+      let gcsUrl: string | undefined;
+      if (this.config.gcsUploadEnabled && this.config.gcsBucketName) {
+        try {
+          const fileName = this.config.outputCsvPath.split('/').pop() || 'export.csv';
+          const destinationFileName = this.config.gcsDestinationPrefix 
+            ? `${this.config.gcsDestinationPrefix}/${fileName}`
+            : fileName;
+
+          gcsUrl = await this.gcsService.uploadFile(
+            this.config.gcsBucketName,
+            this.config.outputCsvPath,
+            destinationFileName,
+            {
+              makePublic: this.config.gcsMakePublic || false,
+              metadata: {
+                'uploaded-at': new Date().toISOString(),
+                'source': 'salesforce-export',
+                'rows': String(firstResponse.returnedRows || firstResponse.rowCount || 0)
+              }
+            }
+          );
+        } catch (gcsError) {
+          this.logger.error('❌ Failed to upload to Google Cloud Storage:', gcsError);
+          // Don't throw error - continue even if GCS upload fails
+        }
+      }
+
       this.logger.info('✅ Salesforce data export completed successfully!', {
         totalRows: firstResponse.returnedRows || firstResponse.rowCount,
         batchesProcessed: batchCount,
-        outputFile: this.config.outputCsvPath
+        outputFile: this.config.outputCsvPath,
+        gcsUrl: gcsUrl || 'Not uploaded'
       });
       
     } catch (error) {

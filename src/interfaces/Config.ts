@@ -8,4 +8,10 @@ export interface Config {
   clientId?: string;
   clientSecret?: string;
   useOAuth: boolean;
+  // Google Cloud Storage settings
+  gcsBucketName?: string;
+  gcsKeyFilename?: string;
+  gcsUploadEnabled?: boolean;
+  gcsMakePublic?: boolean;
+  gcsDestinationPrefix?: string;
 }

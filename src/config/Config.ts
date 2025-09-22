@@ -17,7 +17,13 @@ export class ConfigService {
       outputCsvPath: `./baseevent_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`,
       clientId: process.env.SF_CLIENT_ID,
       clientSecret: process.env.SF_CLIENT_SECRET,
-      useOAuth: useOAuth
+      useOAuth: useOAuth,
+      // Google Cloud Storage settings
+      gcsBucketName: process.env.GCS_BUCKET_NAME,
+      gcsKeyFilename: process.env.GCS_KEY_FILENAME,
+      gcsUploadEnabled: process.env.GCS_UPLOAD_ENABLED === 'true',
+      gcsMakePublic: process.env.GCS_MAKE_PUBLIC === 'true',
+      gcsDestinationPrefix: process.env.GCS_DESTINATION_PREFIX || 'salesforce-exports'
     };
   }
 

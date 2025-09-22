@@ -8,8 +8,9 @@
     "dev": "tsx src/index.ts"
   },
   "dependencies": {
-    "@logtail/node": "^0.5.6",
-    "@logtail/winston": "^0.5.6",
+    "@google-cloud/storage": "^7.17.1",
+    "@logtail/node": "0.5.6",
+    "@logtail/winston": "0.5.6",
     "cron": "4.3.3",
     "dotenv": "16.4.5",
     "winston": "3.17.0"
@@ -17,7 +18,7 @@
   "devDependencies": {
     "@types/node": "24.3.1",
     "ts-patch": "^3.3.0",
-    "tsconfig-paths": "^4.2.0",
+    "tsconfig-paths": "4.2.0",
     "tsx": "4.19.2",
     "typescript": "5.6.3",
     "typescript-transform-paths": "^3.5.5"
