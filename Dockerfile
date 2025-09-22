@@ -16,8 +16,8 @@ RUN npm ci --include=dev && npm cache clean --force
 # Copy source code
 COPY src/ ./src/
 
-# Build the TypeScript application
-RUN npm run build
+# Build the TypeScript application with explicit path transformation
+RUN npx ts-patch install && npm run build
 
 # Stage 2: Production stage
 FROM node:18-alpine AS production
