@@ -14,7 +14,7 @@ export class Application {
 
   async run(): Promise<void> {
     try {
-      this.logger.info('🚀 Starting Salesforce data export...');
+      this.logger.info('🚀 Starting Salesforce data export with new pagination...');
       
       // Initialize authentication if OAuth is enabled
       if (this.config.useOAuth) {
@@ -28,35 +28,31 @@ export class Application {
       const csvWriter = new CsvWriter(this.config.outputCsvPath);
       csvWriter.open();
 
-      // Execute initial query
-      const firstResponse = await this.queryService.executeQuery(this.config.sqlQuery);
+      // Use the new pagination method to get all results
+      const allResponses = await this.queryService.getAllResultsWithPagination(this.config.sqlQuery);
       
-      // Get headers from metadata array
+      if (allResponses.length === 0) {
+        throw new Error('No data returned from query');
+      }
+
+      // Get headers from metadata array (use first response)
+      const firstResponse = allResponses[0];
       const headers = CsvWriter.getHeadersFromMetadata(firstResponse.metadata);
       
       // Write headers
       csvWriter.writeHeaders(headers);
       
-      // Write first batch of data
-      this.writeDataToCsv(csvWriter, firstResponse.data, headers);
-
-      // Handle pagination
-      let batchCount = 1;
-      if (!firstResponse.done && firstResponse.nextBatchId) {
-        let nextBatchId = firstResponse.nextBatchId;
+      // Write all data from all batches
+      let totalRowsWritten = 0;
+      for (let i = 0; i < allResponses.length; i++) {
+        const response = allResponses[i];
+        this.logger.info(`📝 Writing batch ${i + 1}/${allResponses.length} to CSV`, {
+          rowsInBatch: response.data?.length || 0,
+          totalRowsWrittenSoFar: totalRowsWritten
+        });
         
-        while (nextBatchId) {
-          this.logger.info(`📄 Fetching batch ${batchCount + 1}...`);
-          const nextResponse = await this.apiClient.getNextBatch(nextBatchId);
-          this.writeDataToCsv(csvWriter, nextResponse.data, headers);
-          
-          if (nextResponse.done || !nextResponse.nextBatchId) {
-            break;
-          }
-          
-          nextBatchId = nextResponse.nextBatchId;
-          batchCount++;
-        }
+        this.writeDataToCsv(csvWriter, response.data, headers);
+        totalRowsWritten += response.data?.length || 0;
       }
 
       csvWriter.close();
@@ -79,7 +75,7 @@ export class Application {
               metadata: {
                 'uploaded-at': new Date().toISOString(),
                 'source': 'salesforce-export',
-                'rows': String(firstResponse.returnedRows || firstResponse.rowCount || 0)
+                'rows': String(totalRowsWritten)
               }
             }
           );
@@ -89,9 +85,9 @@ export class Application {
         }
       }
 
-      this.logger.info('✅ Salesforce data export completed successfully!', {
-        totalRows: firstResponse.returnedRows || firstResponse.rowCount,
-        batchesProcessed: batchCount,
+      this.logger.info('✅ Salesforce data export completed successfully with new pagination!', {
+        totalRows: totalRowsWritten,
+        totalBatches: allResponses.length,
         outputFile: this.config.outputCsvPath,
         gcsUrl: gcsUrl || 'Not uploaded'
       });

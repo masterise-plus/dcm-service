@@ -108,15 +108,21 @@ export class SalesforceApiClient implements ApiClient {
     }
   }
 
-  async postQuery(sql: string): Promise<QueryResponse> {
+  async postQuery(sql: string, rowLimit?: number): Promise<QueryResponse> {
     const accessToken = await this.getAccessToken();
     const url = `${this.config.instanceUrl}/services/data/${this.config.apiVersion}/ssot/query-sql?dataspace=${encodeURIComponent(this.config.dataspace)}`;
     
     this.logger.info('Executing Salesforce query', { 
       dataspace: this.config.dataspace,
       queryLength: sql.length,
+      rowLimit,
       instanceUrl: this.config.instanceUrl
     });
+
+    const requestBody: any = { sql };
+    if (rowLimit !== undefined) {
+      requestBody.rowLimit = rowLimit;
+    }
 
     const response = await fetch(url, {
       method: 'POST',
@@ -125,7 +131,7 @@ export class SalesforceApiClient implements ApiClient {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
-      body: JSON.stringify({ sql })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
@@ -193,6 +199,53 @@ export class SalesforceApiClient implements ApiClient {
       dataLength: data.data?.length || 0,
       nextBatchId: data.nextBatchId,
       hasMoreBatches: !!data.nextBatchId
+    });
+
+    return data;
+  }
+
+  async getQueryResults(queryId: string, offset: number, rowLimit: number): Promise<QueryResponse> {
+    const accessToken = await this.getAccessToken();
+    const url = `${this.config.instanceUrl}/services/data/${this.config.apiVersion}/ssot/query-sql/${encodeURIComponent(queryId)}/rows?offset=${offset}&rowLimit=${rowLimit}`;
+    
+    this.logger.info('Fetching query results with pagination', { 
+      queryId,
+      offset,
+      rowLimit,
+      url 
+    });
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      this.logger.error('Query results fetch failed', { 
+        status: response.status, 
+        statusText: response.statusText,
+        errorText: text,
+        queryId,
+        offset,
+        rowLimit,
+        url 
+      });
+      throw new Error(`Query results fetch failed ${response.status}: ${text}`);
+    }
+
+    const data = await response.json() as QueryResponse;
+    
+    this.logger.info('✅ Query results fetched successfully', {
+      returnedRows: data.returnedRows,
+      rowCount: data.rowCount,
+      dataLength: data.data?.length || 0,
+      metadataFields: data.metadata?.length || 0,
+      offset,
+      rowLimit
     });
 
     return data;

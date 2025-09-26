@@ -1,4 +1,4 @@
-import { Config } from "../interfaces/Config";
+import { Config } from "@/interfaces/Config";
 
 
 export class ConfigService {
