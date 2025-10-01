@@ -44,6 +44,9 @@ COPY --from=builder /app/dist ./dist
 # Copy environment example file (can be overridden with docker run --env-file)
 COPY .env.example ./.env.example
 
+# Copy Google Cloud service account key file if it exists
+COPY unique-pixel-463108-r1-8c1eb5d5c32d.json* ./
+
 # Create logs directory with proper permissions
 RUN mkdir -p logs && chown -R nodejs:nodejs /app
 

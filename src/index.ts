@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { CronJob } from 'cron';
-import { Application } from './application/Application.js';
-import logger from './utils/Logger.js';
+import { Application } from './application/Application';
+import logger from './utils/Logger';
 
 async function main(): Promise<void> {
   const app = new Application();
